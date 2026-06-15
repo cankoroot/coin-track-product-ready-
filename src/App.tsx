@@ -77,10 +77,6 @@ const CURRENCY_OPTIONS: Array<{ key: Currency; label: string; symbol: string }> 
 ]
 
 function createHeaders(): HeadersInit | undefined {
-    // Avoid sending custom headers when calling the public CoinGecko API
-    // because custom headers trigger CORS preflight which the public
-    // API does not allow for browser origins. Only include a header
-    // when using the Pro API host (`pro-api.coingecko.com`).
     if (!API_KEY) return undefined
 
     if (API_BASE_URL.includes('pro-api.coingecko.com')) {
@@ -137,23 +133,45 @@ function formatChartLabel(timestamp: number, range: RangeKey) {
 }
 
 async function cgFetch<T>(path: string, signal?: AbortSignal): Promise<T> {
-    const fetchUrl = `/api/coingecko${path}`
+    const isLongChart = path.includes('/market_chart') && path.includes('days=365')
+    const directUrl = `${API_BASE_URL}${path}`
+    const proxyUrl = `/api/coingecko${path}`
 
-    let response = await fetch(fetchUrl, {
+    if (!isLongChart) {
+        const resp = await fetch(directUrl, { signal })
+        if (!resp.ok) {
+            const errorText = await resp.text()
+            throw new Error(errorText || `Request failed with ${resp.status}`)
+        }
+
+        return resp.json() as Promise<T>
+    }
+
+    try {
+        const directResp = await fetch(directUrl, { signal })
+        if (directResp.ok) return directResp.json() as Promise<T>
+    } catch (err) {
+    }
+
+    const proxyResp = await fetch(proxyUrl, {
         headers: createHeaders(),
         signal,
     })
 
-    if (response.status === 404 && fetchUrl.startsWith('/api/coingecko')) {
-        response = await fetch(`${API_BASE_URL}${path}`, { signal })
+    if (proxyResp.ok) return proxyResp.json() as Promise<T>
+
+    if (proxyResp.status === 404) {
+        const finalResp = await fetch(directUrl, { signal })
+        if (!finalResp.ok) {
+            const errorText = await finalResp.text()
+            throw new Error(errorText || `Request failed with ${finalResp.status}`)
+        }
+
+        return finalResp.json() as Promise<T>
     }
 
-    if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || `Request failed with ${response.status}`)
-    }
-
-    return response.json() as Promise<T>
+    const errorText = await proxyResp.text()
+    throw new Error(errorText || `Request failed with ${proxyResp.status}`)
 }
 
 function App() {
@@ -464,7 +482,7 @@ function App() {
                                     tick={{ fill: 'rgba(186, 197, 225, 0.85)', fontSize: 12 }}
                                     axisLine={false}
                                     tickLine={false}
-                                    domain={['auto', 'auto']}
+                                    domain={["auto", "auto"]}
                                 />
                                 <Tooltip
                                     formatter={(value) => [formatCurrency(Number(value), currency), 'Fiyat']}
