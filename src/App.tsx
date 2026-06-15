@@ -137,8 +137,7 @@ function formatChartLabel(timestamp: number, range: RangeKey) {
 }
 
 async function cgFetch<T>(path: string, signal?: AbortSignal): Promise<T> {
-    const isLongChart = path.includes('/market_chart') && path.includes('days=365')
-    const fetchUrl = isLongChart ? `/api/coingecko${path}` : `${API_BASE_URL}${path}`
+    const fetchUrl = `/api/coingecko${path}`
 
     const response = await fetch(fetchUrl, {
         headers: createHeaders(),
