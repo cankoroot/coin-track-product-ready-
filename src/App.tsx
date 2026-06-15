@@ -77,11 +77,19 @@ const CURRENCY_OPTIONS: Array<{ key: Currency; label: string; symbol: string }> 
 ]
 
 function createHeaders(): HeadersInit | undefined {
+    // Avoid sending custom headers when calling the public CoinGecko API
+    // because custom headers trigger CORS preflight which the public
+    // API does not allow for browser origins. Only include a header
+    // when using the Pro API host (`pro-api.coingecko.com`).
     if (!API_KEY) return undefined
 
-    return {
-        'x-cg-demo-api-key': API_KEY,
+    if (API_BASE_URL.includes('pro-api.coingecko.com')) {
+        return {
+            'x-cg-pro-api-key': API_KEY,
+        }
     }
+
+    return undefined
 }
 
 function formatCurrency(value: number, currency: Currency) {
