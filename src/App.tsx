@@ -12,6 +12,7 @@ import './App.css'
 
 const API_KEY = import.meta.env.VITE_COINGECKO_API_KEY as string | undefined
 const API_BASE_URL = 'https://api.coingecko.com/api/v3'
+const API_COOLDOWN_MS = 15_000
 
 type Currency = 'usd' | 'try'
 type RangeKey = '1d' | '7d' | '30d' | '365d'
@@ -187,6 +188,7 @@ function App() {
     const [searching, setSearching] = useState(false)
     const [error, setError] = useState('')
     const selectedCoinRef = useRef<SearchResult | null>(null)
+    const lastManualRequestAtRef = useRef(0)
 
     useEffect(() => {
         selectedCoinRef.current = selectedCoin
@@ -294,6 +296,15 @@ function App() {
 
         const query = searchQuery.trim()
         if (!query) return
+
+        const now = Date.now()
+        const elapsedSinceLastRequest = now - lastManualRequestAtRef.current
+        if (elapsedSinceLastRequest < API_COOLDOWN_MS) {
+            setError('15 Saniye Bekleyin. API Cooldown devrede')
+            return
+        }
+
+        lastManualRequestAtRef.current = now
 
         setSearching(true)
         setError('')
